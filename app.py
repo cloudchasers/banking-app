@@ -29,4 +29,4 @@ def process_payment():
 if __name__ == '__main__':
     # Run on all available IPs so you can test it on your mobile phone
     # by connecting to the same WiFi and visiting your computer's local IP.
-    app.run(host='0.0.0.0', port=80, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
