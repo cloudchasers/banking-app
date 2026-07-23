@@ -2,8 +2,9 @@ pipeline {
     agent any
 
     environment {
-        IMAGE = '<registry>/banking-app'
-        TAG = 'latest'
+        REGISTRY = "cloudchasers.azurecr.io"
+        IMAGE_NAME = "banking-app"
+        TAG = "latest"
     }
 
     stages {
@@ -18,63 +19,58 @@ pipeline {
             }
         }
 
-        stage('Build & Unit Test') {
+        stage('Build Docker Image') {
             steps {
-                echo 'Install requirements'
-                echo 'Run pytest'
-                // sh 'pip install -r requirements.txt'
-                // sh 'pytest'
+                sh '''
+                    docker build -t ${IMAGE_NAME}:${TAG} .
+                '''
             }
         }
 
-        stage('Docker Build & Push') {
+        stage('Login to ACR') {
             steps {
-                echo 'Build Docker image'
-                echo 'Push Docker image'
-                // sh 'docker build -t $IMAGE:$TAG .'
-                // sh 'docker push $IMAGE:$TAG'
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'acr-creds',
+                        usernameVariable: 'ACR_USER',
+                        passwordVariable: 'ACR_PASS'
+                    )
+                ]) {
+                    sh '''
+                        echo "$ACR_PASS" | docker login ${REGISTRY} \
+                          -u "$ACR_USER" \
+                          --password-stdin
+                    '''
+                }
             }
         }
 
-        stage('Deploy to Test (ACI)') {
+        stage('Tag Image') {
             steps {
-                echo 'Deploy to Azure Container Instance'
-                // sh './deploy/aci-deploy.sh $IMAGE:$TAG'
+                sh '''
+                    docker tag ${IMAGE_NAME}:${TAG} \
+                    ${REGISTRY}/${IMAGE_NAME}:${TAG}
+                '''
             }
         }
 
-        stage('Smoke Test') {
+        stage('Push Image') {
             steps {
-                echo 'Run smoke tests'
-                // sh 'pytest tests/smoke --base-url=$TEST_URL'
-            }
-        }
-
-        stage('Approve Prod Deploy') {
-            steps {
-                input message: 'Deploy to production?'
-            }
-        }
-
-        stage('Deploy to Prod (K8s)') {
-            steps {
-                echo 'Deploy to Kubernetes'
-                // sh 'kubectl set image deployment/banking-app app=$IMAGE:$TAG'
+                sh '''
+                    docker push \
+                    ${REGISTRY}/${IMAGE_NAME}:${TAG}
+                '''
             }
         }
     }
 
     post {
         success {
-            echo 'Banking pipeline completed successfully'
+            echo 'Image successfully pushed to ACR'
         }
 
         failure {
-            echo 'Banking pipeline failed'
-        }
-
-        always {
-            echo 'Pipeline finished'
+            echo 'Pipeline failed'
         }
     }
 }
