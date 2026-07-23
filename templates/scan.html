@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scan QR Code - Banking</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+  <style>
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background-color: #f3f4f6;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+
+    .card {
+        background: white;
+        padding: 32px;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        width: 100%;
+        max-width: 400px;
+    }
+
+    h2 {
+        margin-top: 0;
+        margin-bottom: 8px;
+        color: #111827;
+        text-align: center;
+    }
+
+    .subtitle {
+        text-align: center;
+        color: #4b5563;
+        font-size: 14px;
+        margin-top: 0;
+        margin-bottom: 24px;
+    }
+
+    .scanner-wrapper {
+        background: #000;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 20px;
+        position: relative;
+        min-height: 280px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #qr-reader {
+        width: 100%;
+    }
+
+    #qr-reader video {
+        object-fit: cover;
+        width: 100% !important;
+        border-radius: 12px;
+    }
+
+    .btn {
+        display: block;
+        width: 100%;
+        padding: 14px;
+        background-color: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        box-sizing: border-box;
+        text-align: center;
+        text-decoration: none;
+    }
+
+    .btn:hover {
+        background-color: #1d4ed8;
+    }
+
+    .btn-secondary {
+        background-color: transparent;
+        color: #4b5563;
+        border: 1px solid #e5e7eb;
+        margin-top: 10px;
+    }
+
+    .btn-secondary:hover {
+        background-color: #f9fafb;
+    }
+
+    /* Hidden File Input for Image Upload */
+    #qr-input-file {
+        display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>Scan to Pay</h2>
+    <p class="subtitle">Position the QR code within the frame</p>
+
+    <div class="scanner-wrapper">
+      <div id="qr-reader"></div>
+    </div>
+
+    <!-- Actions -->
+    <label for="qr-input-file" class="btn">Upload QR Image</label>
+    <input type="file" id="qr-input-file" accept="image/*">
+
+    <button class="btn btn-secondary" onclick="window.history.back()">Cancel</button>
+  </div>
+
+  <script>
+    const html5QrCode = new Html5Qrcode("qr-reader");
+
+    function handleSuccess(decodedText) {
+        // Stop scanning upon detection
+        html5QrCode.stop().then(() => {
+            window.location.href = `/review?data=${encodeURIComponent(decodedText)}`;
+        }).catch(() => {
+            window.location.href = `/review?data=${encodeURIComponent(decodedText)}`;
+        });
+    }
+
+    // 1. Auto-Start Live Camera Scanner on Page Load
+    window.addEventListener("DOMContentLoaded", () => {
+        const config = {
+            fps: 10,
+            qrbox: { width: 220, height: 220 },
+            aspectRatio: 1.0
+        };
+
+        // 'environment' automatically requests the back camera on mobile devices
+        html5QrCode.start({ facingMode: "environment" }, config, handleSuccess)
+            .catch(err => {
+                console.warn("Camera auto-start failed or permission denied:", err);
+            });
+    });
+
+    // 2. Handle File Upload Scanning
+    const fileInput = document.getElementById('qr-input-file');
+    fileInput.addEventListener('change', e => {
+        if (e.target.files.length === 0) return;
+
+        const imageFile = e.target.files[0];
+
+        // Scan the uploaded file
+        html5QrCode.scanFile(imageFile, true)
+            .then(decodedText => {
+                handleSuccess(decodedText);
+            })
+            .catch(err => {
+                alert("No readable QR code found in this image. Please try another.");
+            });
+    });
+  </script>
+
+</body>
+</html>
