@@ -1,13 +1,83 @@
 import os
 import io
+import json
 import qrcode
 import requests
-from flask import Flask, render_template, request, send_file
+from functools import wraps
+from flask import Flask, render_template, request, redirect, url_for, make_response, send_file
 from decryptor import decrypt
+from login import login_required
+from bankdb_account_query import query_account_by_accountno, query_account_by_username
 
 app = Flask(__name__)
+ACCOUNT_NO = None
 
 @app.route('/')
+def index():
+    # If cookie is present, redirect to review
+    if request.cookies.get("username"):
+        return redirect(url_for("dashboard"))
+    return redirect(url_for("login"))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    account = None
+    global ACCOUNT_NO
+
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        account = query_account_by_username(username)
+
+        # Verify credentials against db
+        if (account is not None) and username == account[1] and password == account[3]:
+            # Create a redirect response and attach the auth cookie
+            ACCOUNT_NO = account[0]
+            response = make_response(redirect(url_for("dashboard")))
+
+            # httponly prevents JavaScript from stealing the cookie
+            response.set_cookie(
+                "username", username, httponly=True, samesite="Lax"
+            )
+
+            return response
+        else:
+            error = "Invalid username or password."
+
+        account = None
+
+    return render_template("login.html", error=error)
+
+@app.route('/dashboard', methods=["GET"])
+def dashboard():
+    # Account data dictionary stored inside the route function
+    global ACCOUNT_NO
+    account = query_account_by_accountno(ACCOUNT_NO)
+    print(account)
+
+    account_info = {
+        "customer_name": str(account[2]),
+        "account_number": str(account[0]),
+        "account_type": str(account[5]),
+        "balance": account[4],
+    }
+
+    account = None
+
+    return render_template('dashboard.html', account=account_info)
+
+@app.route('/logout')
+def logout():
+    return redirect(url_for('login'))
+
+@app.route('/scan')
+def scan_page():
+    return render_template('scan.html')
+
+@app.route('/review')
 def review_payment():
     token = request.args.get('data')
 
@@ -56,7 +126,8 @@ def process_payment():
             print(f"Failed to send webhook: {e}")
 
     return render_template('result.html', success=is_successful)
-
+    
+# testing for jenkins webhook1
 
 if __name__ == '__main__':
     # Run on all available IPs so you can test it on your mobile phone
