@@ -27,10 +27,10 @@ def review_payment():
 def generate_qr():
     token = request.args.get('data')
     if not token:
-        return "Missing token", 400
-    payment_url = f"http://127.0.0.1:5001/?data={token}"
+        return "No token provided", 400
+        
     qr = qrcode.QRCode(version=1, box_size=10, border=4)
-    qr.add_data(payment_url)
+    qr.add_data(token)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
     
