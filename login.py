@@ -3,12 +3,12 @@ import json
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, make_response
 
-# Helper to load users from json file
-def load_users():
-    if os.path.exists('users.json'):
-        with open('users.json', 'r') as f:
-            return json.load(f)
-    return {}
+# # Helper to load users from json file
+# def load_users():
+#     if os.path.exists('users.json'):
+#         with open('users.json', 'r') as f:
+#             return json.load(f)
+#     return {}
 
 
 # Login requirement decorator (Checks cookie instead of session)

@@ -3,10 +3,11 @@ import json
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, make_response
 from decryptor import decrypt
-from login import load_users, login_required
+from login import login_required
+from bankdb_account_query import query_account_by_accountno, query_account_by_username
 
 app = Flask(__name__)
-
+ACCOUNT_NO = None
 
 @app.route('/')
 def index():
@@ -19,15 +20,19 @@ def index():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = None
+    account = None
+    global ACCOUNT_NO
+
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
 
-        users = load_users()
+        account = query_account_by_username(username)
 
-        # Verify credentials against users.json
-        if username in users and users[username] == password:
+        # Verify credentials against db
+        if (account is not None) and username == account[1] and password == account[3]:
             # Create a redirect response and attach the auth cookie
+            ACCOUNT_NO = account[0]
             response = make_response(redirect(url_for("dashboard")))
 
             # httponly prevents JavaScript from stealing the cookie
@@ -39,17 +44,26 @@ def login():
         else:
             error = "Invalid username or password."
 
+        account = None
+
     return render_template("login.html", error=error)
 
-@app.route('/dashboard')
+@app.route('/dashboard', methods=["GET"])
 def dashboard():
     # Account data dictionary stored inside the route function
+    global ACCOUNT_NO
+    account = query_account_by_accountno(ACCOUNT_NO)
+    print(account)
+
     account_info = {
-        "customer_name": "Alex Mercer",
-        "account_number": "**** **** 4829",
-        "account_type": "Regular Savings Account",
-        "balance": 12450.75
+        "customer_name": str(account[2]),
+        "account_number": str(account[0]),
+        "account_type": str(account[5]),
+        "balance": account[4],
     }
+
+    account = None
+
     return render_template('dashboard.html', account=account_info)
 
 @app.route('/logout')
