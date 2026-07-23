@@ -14,10 +14,6 @@ ACCOUNT_NO = None
 
 @app.route('/')
 def index():
-    token = request.args.get('data')
-    if token:
-        return redirect(url_for('display_qr', data=token))
-        
     # If cookie is present, redirect to dashboard
     if request.cookies.get("username"):
         return redirect(url_for("dashboard"))
@@ -81,7 +77,7 @@ def logout():
 def scan_page():
     return render_template('scan.html')
 
-@app.route('/display_qr')
+@app.route('/pay')
 def display_qr():
     token = request.args.get('data')
     if not token:
