@@ -119,12 +119,19 @@ def generate_qr():
 
 @app.route('/process', methods=['POST'])
 def process_payment():
-    # Here is where you would normally call your payment gateway API.
-    # We will simulate a successful transaction for this example.
-    # Change this to False to see the failure screen.
-    is_successful = True
     order_id = request.form.get('order_id')
+    amount_str = request.form.get('amount')
+    username = request.cookies.get("username")
     
+    is_successful = False
+    if username and order_id and amount_str:
+        try:
+            amount = float(amount_str)
+            from bankdb_transaction_query import process_transaction
+            is_successful = process_transaction(username, amount)
+        except ValueError:
+            pass
+            
     if is_successful and order_id:
         try:
             # Send webhook to eCommerce app
