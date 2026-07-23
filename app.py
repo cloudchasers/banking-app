@@ -14,7 +14,11 @@ ACCOUNT_NO = None
 
 @app.route('/')
 def index():
-    # If cookie is present, redirect to review
+    token = request.args.get('data')
+    if token:
+        return redirect(url_for('display_qr', data=token))
+        
+    # If cookie is present, redirect to dashboard
     if request.cookies.get("username"):
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
@@ -77,6 +81,13 @@ def logout():
 def scan_page():
     return render_template('scan.html')
 
+@app.route('/display_qr')
+def display_qr():
+    token = request.args.get('data')
+    if not token:
+        return "<h2>Error: Missing payment data (?data=...)</h2><p>This page should be accessed from the eCommerce checkout.</p>", 400
+    return render_template('qr_display.html', token=token)
+
 @app.route('/review')
 def review_payment():
     token = request.args.get('data')
@@ -121,7 +132,8 @@ def process_payment():
     if is_successful and order_id:
         try:
             # Send webhook to eCommerce app
-            requests.post(f"http://127.0.0.1:5000/api/order/confirm/{order_id}", timeout=5)
+            ecommerce_base = os.environ.get('ECOMMERCE_PUBLIC_BASE', 'http://127.0.0.1:5000')
+            requests.post(f"{ecommerce_base}/api/order/confirm/{order_id}", timeout=5)
         except Exception as e:
             print(f"Failed to send webhook: {e}")
 
