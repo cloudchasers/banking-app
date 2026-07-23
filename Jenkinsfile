@@ -27,7 +27,7 @@ pipeline {
                 -i /var/lib/jenkins/.ssh/jenkins_deploy_key \
                 ubuntu@44.222.238.61 \
                 "
-                cd /home/ubuntu/ecommerce-app &&
+                cd /home/ubuntu/banking-app &&
                 docker compose up -d --build
                 "
             '''
