@@ -5,6 +5,7 @@ from decryptor import decrypt
 app = Flask(__name__)
 
 @app.route('/')
+@app.route('/pay')
 def review_payment():
     full_url = request.url  # for prod
     # full_url = "http://127.0.0.1:5000/pay?data=eyJvcmRlcl9pZCI6IjRBQ0EzNDk1NjAiLCJhbW91bnQiOiIzLjc1IiwidXNlciI6ImFkbWluIn0.amCXng.DcG9403NkV0ctcmgPGF3wslATEI" #request.url
