@@ -1,10 +1,66 @@
 import os
-from flask import Flask, render_template, request
+import json
+from functools import wraps
+from flask import Flask, render_template, request, redirect, url_for, make_response
 from decryptor import decrypt
+from login import load_users, login_required
 
 app = Flask(__name__)
 
+
 @app.route('/')
+def index():
+    # If cookie is present, redirect to review
+    if request.cookies.get("username"):
+        return redirect(url_for("dashboard"))
+    return redirect(url_for("login"))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        users = load_users()
+
+        # Verify credentials against users.json
+        if username in users and users[username] == password:
+            # Create a redirect response and attach the auth cookie
+            response = make_response(redirect(url_for("dashboard")))
+
+            # httponly prevents JavaScript from stealing the cookie
+            response.set_cookie(
+                "username", username, httponly=True, samesite="Lax"
+            )
+
+            return response
+        else:
+            error = "Invalid username or password."
+
+    return render_template("login.html", error=error)
+
+@app.route('/dashboard')
+def dashboard():
+    # Account data dictionary stored inside the route function
+    account_info = {
+        "customer_name": "Alex Mercer",
+        "account_number": "**** **** 4829",
+        "account_type": "Regular Savings Account",
+        "balance": 12450.75
+    }
+    return render_template('dashboard.html', account=account_info)
+
+@app.route('/logout')
+def logout():
+    return redirect(url_for('login'))
+
+@app.route('/scan')
+def scan_page():
+    return render_template('scan.html')
+
+@app.route('/review')
 def review_payment():
     full_url = request.url  # for prod
     # full_url = "http://127.0.0.1:5000/pay?data=eyJvcmRlcl9pZCI6IjRBQ0EzNDk1NjAiLCJhbW91bnQiOiIzLjc1IiwidXNlciI6ImFkbWluIn0.amCXng.DcG9403NkV0ctcmgPGF3wslATEI" #request.url
