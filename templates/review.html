@@ -48,9 +48,10 @@
     <div class="card">
         <h2>Confirm Payment</h2>
         <div class="details">
+            <div class="row"><span>Payee:</span> <span style="text-transform: uppercase;">{{ tx.user }}</span></div>
             <div class="row"><span>Merchant:</span> <span>{{ tx.merchant_name }}</span></div>
-            <div class="row"><span>Order ID:</span> <span>{{ tx.order_id }}</span></div>
-            <div class="row total"><span>Amount:</span> <span>{{ tx.amount }}</span></div>
+            <div class="row"><span>Order ID:</span> <span>ODR-{{ tx.order_id }}</span></div>
+            <div class="row total"><span>Amount:</span> <span>₱{{ tx.amount }}</span></div>
         </div>
         
         <!-- Submitting this form triggers the /process route -->
