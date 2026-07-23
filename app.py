@@ -132,7 +132,7 @@ def process_payment():
     if is_successful and order_id:
         try:
             # Send webhook to eCommerce app
-            ecommerce_base = os.environ.get('ECOMMERCE_PUBLIC_URL', 'http://127.0.0.1:5000')
+            ecommerce_base = os.environ.get('ECOMMERCE_PUBLIC_BASE', 'http://127.0.0.1:5000')
             requests.post(f"{ecommerce_base}/api/order/confirm/{order_id}", timeout=5)
         except Exception as e:
             print(f"Failed to send webhook: {e}")
