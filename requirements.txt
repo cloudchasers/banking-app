@@ -1,2 +1,5 @@
 Flask
-mysql
+itsdangerous
+qrcode[pil]
+Pillow
+requests
