@@ -3,11 +3,11 @@ from flask import Flask, render_template, request
 from decryptor import decrypt
 
 app = Flask(__name__)
-full_url = request.url #for prod
-# full_url = "http://127.0.0.1:5000/pay?data=eyJvcmRlcl9pZCI6IjRBQ0EzNDk1NjAiLCJhbW91bnQiOiIzLjc1IiwidXNlciI6ImFkbWluIn0.amCXng.DcG9403NkV0ctcmgPGF3wslATEI" #request.url
 
 @app.route('/')
 def review_payment():
+    full_url = request.url  # for prod
+    # full_url = "http://127.0.0.1:5000/pay?data=eyJvcmRlcl9pZCI6IjRBQ0EzNDk1NjAiLCJhbW91bnQiOiIzLjc1IiwidXNlciI6ImFkbWluIn0.amCXng.DcG9403NkV0ctcmgPGF3wslATEI" #request.url
 
     transaction_data = decrypt(full_url)
     transaction_data["merchant_name"] = "Little Crumbs Patissieries"
