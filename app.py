@@ -10,6 +10,7 @@ from login import login_required
 from bankdb_account_query import query_account_by_accountno, query_account_by_username
 from bankdb_transaction_query import query_transactions_by_accountno
 from pay import proceed_payment
+from decryptor import decrypt, parse_qr_data
 
 from datetime import datetime, timedelta, timezone
 
@@ -135,7 +136,15 @@ def display_qr():
     token = request.args.get('data')
     if not token:
         return "<h2>Error: Missing payment data (?data=...)</h2><p>This page should be accessed from the eCommerce checkout.</p>", 400
-    return render_template('qr_display.html', token=token)
+        
+    order_id = None
+    try:
+        data = parse_qr_data(token)
+        order_id = data.get('order_id')
+    except Exception as e:
+        print(f"QR decode error: {e}")
+
+    return render_template('qr_display.html', token=token, order_id=order_id)
 
 
 @app.route('/review')
@@ -196,6 +205,15 @@ def process_payment():
             print(f"Failed to process or send webhook: {e}")
 
     return render_template('result.html', success=is_successful)
+
+@app.route('/api/check_status/<order_id>')
+def check_status(order_id):
+    try:
+        ecommerce_base = os.environ.get('ECOMMERCE_PUBLIC_BASE', 'http://127.0.0.1:5000')
+        res = requests.get(f"{ecommerce_base}/api/order/status/{order_id}", timeout=5)
+        return res.json()
+    except Exception as e:
+        return {"error": str(e)}, 500
     
 # testing for jenkins webhook1
 

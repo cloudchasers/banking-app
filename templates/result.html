@@ -36,7 +36,12 @@
             <div class="icon">✅</div>
             <h2 class="success-text">Payment Successful</h2>
             <p>Your transaction has been processed securely.</p>
-            <p><strong>Please close this window and return to the main application to continue.</strong></p>
+            <p><strong>This window will close automatically in a moment...</strong></p>
+            <script>
+                setTimeout(() => {
+                    window.close();
+                }, 3000);
+            </script>
         {% else %}
             <div class="icon">❌</div>
             <h2 class="error-text">Payment Failed</h2>

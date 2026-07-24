@@ -41,6 +41,41 @@
         <div style="margin-bottom: 24px;">
             <img src="/qrcode?data={{ token }}" alt="Payment QR Code" style="max-width: 100%; border-radius: 8px; border: 1px solid #e5e7eb;">
         </div>
+        
+        <div style="margin-bottom: 16px; font-size: 14px; color: #4b5563;">
+            <span id="status-text">Waiting for payment...</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <a href="/review?data={{ token }}" style="display: block; width: 100%; padding: 12px; background-color: #2563eb; color: white; border-radius: 8px; text-decoration: none; font-weight: bold;">Or Pay Here in Browser</a>
+            <button onclick="window.close()" style="display: block; width: 100%; padding: 12px; background-color: white; color: #4b5563; border: 1px solid #d1d5db; border-radius: 8px; cursor: pointer; font-weight: bold;">Close Window</button>
+        </div>
     </div>
+
+    {% if order_id %}
+    <script>
+        const orderId = "{{ order_id }}";
+        const statusText = document.getElementById('status-text');
+        
+        const pollInterval = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/check_status/${orderId}`);
+                const data = await res.json();
+                
+                if (data.status === 'paid') {
+                    clearInterval(pollInterval);
+                    statusText.innerHTML = '<span style="color: #16a34a; font-weight: bold;">Payment Successful! Closing...</span>';
+                    
+                    // Close the window after a short delay
+                    setTimeout(() => {
+                        window.close();
+                    }, 2000);
+                }
+            } catch (err) {
+                console.error("Status check failed", err);
+            }
+        }, 3000);
+    </script>
+    {% endif %}
 </body>
 </html>
