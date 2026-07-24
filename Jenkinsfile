@@ -24,7 +24,7 @@ pipeline {
         sh '''
             ssh -o StrictHostKeyChecking=no \
             -i /var/lib/jenkins/.ssh/jenkins_deploy_key \
-            ubuntu@44.222.238.61 \
+            ubuntu@13.218.183.154\
             "
             cd /home/ubuntu/banking-app &&
             git pull &&
