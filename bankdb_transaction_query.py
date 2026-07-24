@@ -10,39 +10,32 @@ config = {
     'password': 'MyStrongPassword123!'
 }
 
-def process_transaction(username, amount):
+def query_transactions_by_accountno(accountno):
     try:
+        # 1. Establish the connection
+        print("Connecting to MySQL database...")
         connection = mysql.connector.connect(**config)
+
         if connection.is_connected():
+            # 2. Create a cursor object
             cursor = connection.cursor()
-            
-            # 1. Fetch current balance
-            cursor.execute(f"SELECT balance FROM accounts WHERE username = '{username}'")
-            result = cursor.fetchone()
-            
-            if not result:
-                return False
-                
-            current_balance = float(result[0])
-            amount = float(amount)
-            
-            # 2. Check if sufficient balance
-            if current_balance < amount:
-                return False
-                
-            # 3. Deduct balance
-            new_balance = current_balance - amount
-            cursor.execute(f"UPDATE accounts SET balance = {new_balance} WHERE username = '{username}'")
-            
-            connection.commit()
-            return True
-            
+
+            # 3. Execute query to select all data from the table
+            query = f"SELECT * FROM transactions WHERE debit_account = '{accountno}' OR credit_account = '{accountno}'"
+            cursor.execute(query)
+
+            history = cursor.fetchall()
+            print(history)
+
     except Error as e:
-        print(f"Error processing transaction: {e}")
-        return False
-        
+        print(f"Error connecting to database: {e}")
+
     finally:
+        # 6. Ensure connection and cursor are safely closed
         if 'cursor' in locals() and cursor:
             cursor.close()
         if 'connection' in locals() and connection.is_connected():
             connection.close()
+            print("Database connection closed.")
+
+    return history

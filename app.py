@@ -8,12 +8,18 @@ from flask import Flask, render_template, request, redirect, url_for, make_respo
 from decryptor import decrypt
 from login import login_required
 from bankdb_account_query import query_account_by_accountno, query_account_by_username
+from bankdb_transaction_query import query_transactions_by_accountno
+from pay import proceed_payment
 
 app = Flask(__name__)
 ACCOUNT_NO = None
 
 @app.route('/')
 def index():
+    token = request.args.get('data')
+    if token:
+        return redirect(url_for('display_qr', data=token))
+        
     # If cookie is present, redirect to dashboard
     if request.cookies.get("username"):
         return redirect(url_for("dashboard"))
@@ -73,11 +79,42 @@ def dashboard():
 def logout():
     return redirect(url_for('login'))
 
+
+@app.route("/transactions")
+def transactions():
+    raw_transactions = query_transactions_by_accountno(ACCOUNT_NO)
+    processed_transactions = []
+
+    for tx_id, debit_acc, credit_acc, amount in raw_transactions:
+        if str(debit_acc) == str(ACCOUNT_NO):
+            tx_type = "Debit"
+            other_party = credit_acc
+            formatted_amount = f"-₱{amount:,.2f}"
+        else:
+            tx_type = "Credit"
+            other_party = debit_acc
+            formatted_amount = f"+₱{amount:,.2f}"
+
+        processed_transactions.append(
+            {
+                "id": tx_id,
+                "type": tx_type,
+                "other_party": other_party,
+                "amount": formatted_amount,
+            }
+        )
+
+    return render_template(
+        "transactions.html",
+        transactions=processed_transactions,
+        account_no=ACCOUNT_NO,
+    )
+
 @app.route('/scan')
 def scan_page():
     return render_template('scan.html')
 
-@app.route('/pay')
+@app.route('/display_qr')
 def display_qr():
     token = request.args.get('data')
     if not token:
@@ -119,25 +156,23 @@ def generate_qr():
 
 @app.route('/process', methods=['POST'])
 def process_payment():
+    # Here is where you would normally call your payment gateway API.
+    # We will simulate a successful transaction for this example.
+    # Change this to False to see the failure screen.
+    is_successful = True
     order_id = request.form.get('order_id')
-    amount_str = request.form.get('amount')
-    username = request.cookies.get("username")
+    pay_amt = request.form.get('amount')
     
-    is_successful = False
-    if username and order_id and amount_str:
-        try:
-            amount = float(amount_str)
-            from bankdb_transaction_query import process_transaction
-            is_successful = process_transaction(username, amount)
-        except ValueError:
-            pass
-            
     if is_successful and order_id:
         try:
+            # update db accounts and transaction
+            proceed_payment(ACCOUNT_NO, pay_amt)
+
             # Send webhook to eCommerce app
             ecommerce_base = os.environ.get('ECOMMERCE_PUBLIC_BASE', 'http://127.0.0.1:5000')
             requests.post(f"{ecommerce_base}/api/order/confirm/{order_id}", timeout=5)
         except Exception as e:
+            is_successful = False
             print(f"Failed to send webhook: {e}")
 
     return render_template('result.html', success=is_successful)
