@@ -1,0 +1,35 @@
+name: Deploy Banking App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Tests
+        run: |
+          python -m unittest discover -s .
+        env:
+          ECOMMERCE_PUBLIC_BASE: ${{ secrets.ECOMMERCE_PUBLIC_BASE || 'http://127.0.0.1:5000' }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY || 'dev-secret-key' }}
+
+      - name: Build Docker Image
+        run: |
+          docker build -t banking-app:latest .

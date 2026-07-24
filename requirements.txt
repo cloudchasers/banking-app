@@ -1,2 +1,9 @@
+Flask==3.1.3
+mysql-connector-python==9.7.0
 Flask
-mysql
+itsdangerous
+qrcode[pil]
+Pillow
+requests
+PyMySQL
+gunicorn
