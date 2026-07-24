@@ -4,18 +4,41 @@ import json
 import qrcode
 import requests
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, make_response, send_file
+from flask import Flask, render_template, request, redirect, url_for, make_response, send_file, session
 from decryptor import decrypt
 from login import login_required
 from bankdb_account_query import query_account_by_accountno, query_account_by_username
 from bankdb_transaction_query import query_transactions_by_accountno
 from pay import proceed_payment
 
+from datetime import datetime, timedelta, timezone
+
 app = Flask(__name__)
-ACCOUNT_NO = None
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=15)
+
+@app.before_request
+def check_banking_session_timeout():
+    session.permanent = True
+    if request.endpoint == 'static':
+        return
+
+    if 'username' in session:
+        now = datetime.now(timezone.utc).timestamp()
+        last_active = session.get('last_active')
+        timeout_seconds = 15 * 60  # 15 minutes session timeout
+        
+        if last_active and (now - last_active > timeout_seconds):
+            session.clear()
+            response = make_response(redirect(url_for('login')))
+            response.set_cookie("username", "", expires=0)
+            return response
+            
+        session['last_active'] = now
 
 @app.route('/')
 def index():
+
     token = request.args.get('data')
     if token:
         return redirect(url_for('display_qr', data=token))
@@ -29,8 +52,6 @@ def index():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = None
-    account = None
-    global ACCOUNT_NO
 
     if request.method == "POST":
         username = request.form.get("username")
@@ -40,29 +61,21 @@ def login():
 
         # Verify credentials against db
         if (account is not None) and username == account[1] and password == account[3]:
-            # Create a redirect response and attach the auth cookie
-            ACCOUNT_NO = account[0]
-            response = make_response(redirect(url_for("dashboard")))
-
-            # httponly prevents JavaScript from stealing the cookie
-            response.set_cookie(
-                "username", username, httponly=True, samesite="Lax"
-            )
-
-            return response
+            session.permanent = True
+            session['username'] = username
+            session['account_no'] = account[0]
+            session['last_active'] = datetime.now(timezone.utc).timestamp()
+            return redirect(url_for("dashboard"))
         else:
             error = "Invalid username or password."
-
-        account = None
 
     return render_template("login.html", error=error)
 
 @app.route('/dashboard', methods=["GET"])
+@login_required
 def dashboard():
-    # Account data dictionary stored inside the route function
-    global ACCOUNT_NO
-    account = query_account_by_accountno(ACCOUNT_NO)
-    print(account)
+    account_no = session.get('account_no')
+    account = query_account_by_accountno(account_no)
 
     account_info = {
         "customer_name": str(account[2]),
@@ -71,22 +84,23 @@ def dashboard():
         "balance": account[4],
     }
 
-    account = None
-
     return render_template('dashboard.html', account=account_info)
 
 @app.route('/logout')
 def logout():
+    session.clear()
     return redirect(url_for('login'))
 
 
 @app.route("/transactions")
+@login_required
 def transactions():
-    raw_transactions = query_transactions_by_accountno(ACCOUNT_NO)
+    account_no = session.get('account_no')
+    raw_transactions = query_transactions_by_accountno(account_no)
     processed_transactions = []
 
     for tx_id, debit_acc, credit_acc, amount in raw_transactions:
-        if str(debit_acc) == str(ACCOUNT_NO):
+        if str(debit_acc) == str(account_no):
             tx_type = "Debit"
             other_party = credit_acc
             formatted_amount = f"-₱{amount:,.2f}"
@@ -107,13 +121,15 @@ def transactions():
     return render_template(
         "transactions.html",
         transactions=processed_transactions,
-        account_no=ACCOUNT_NO,
+        account_no=account_no,
     )
 
 @app.route('/scan')
+@login_required
 def scan_page():
     return render_template('scan.html')
 
+@app.route('/pay')
 @app.route('/display_qr')
 def display_qr():
     token = request.args.get('data')
@@ -121,7 +137,9 @@ def display_qr():
         return "<h2>Error: Missing payment data (?data=...)</h2><p>This page should be accessed from the eCommerce checkout.</p>", 400
     return render_template('qr_display.html', token=token)
 
+
 @app.route('/review')
+@login_required
 def review_payment():
     token = request.args.get('data')
 
@@ -155,6 +173,7 @@ def generate_qr():
 
 
 @app.route('/process', methods=['POST'])
+@login_required
 def process_payment():
     # Here is where you would normally call your payment gateway API.
     # We will simulate a successful transaction for this example.
@@ -162,18 +181,19 @@ def process_payment():
     is_successful = True
     order_id = request.form.get('order_id')
     pay_amt = request.form.get('amount')
+    account_no = session.get('account_no')
     
-    if is_successful and order_id:
+    if is_successful and order_id and account_no:
         try:
             # update db accounts and transaction
-            proceed_payment(ACCOUNT_NO, pay_amt)
+            proceed_payment(account_no, pay_amt)
 
             # Send webhook to eCommerce app
             ecommerce_base = os.environ.get('ECOMMERCE_PUBLIC_BASE', 'http://127.0.0.1:5000')
             requests.post(f"{ecommerce_base}/api/order/confirm/{order_id}", timeout=5)
         except Exception as e:
             is_successful = False
-            print(f"Failed to send webhook: {e}")
+            print(f"Failed to process or send webhook: {e}")
 
     return render_template('result.html', success=is_successful)
     

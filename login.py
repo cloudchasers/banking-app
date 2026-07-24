@@ -11,13 +11,14 @@ from flask import Flask, render_template, request, redirect, url_for, make_respo
 #     return {}
 
 
-# Login requirement decorator (Checks cookie instead of session)
+from flask import redirect, url_for, session
+from functools import wraps
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Read the 'username' cookie from the incoming request
-        if not request.cookies.get("username"):
-            return redirect(url_for("login"))
+        # Check if user is logged into the session
+        if 'username' not in session:
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
-
-    return decorated_function
+    return decorated_function

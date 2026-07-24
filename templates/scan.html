@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Scan QR Code - Banking</title>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
   <style>
     body {
@@ -25,7 +26,7 @@
         border-radius: 16px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
         width: 100%;
-        max-width: 400px;
+        max-width: 420px;
     }
 
     h2 {
@@ -40,17 +41,18 @@
         color: #4b5563;
         font-size: 14px;
         margin-top: 0;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
     }
 
     .scanner-wrapper {
         background: #000;
         border-radius: 12px;
         overflow: hidden;
-        margin-bottom: 20px;
+        margin-bottom: 16px;
         position: relative;
-        min-height: 280px;
+        min-height: 200px;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
     }
@@ -65,6 +67,20 @@
         border-radius: 12px;
     }
 
+    .preview-container {
+        display: none;
+        width: 100%;
+        text-align: center;
+        padding: 10px;
+    }
+
+    .preview-img {
+        max-width: 100%;
+        max-height: 200px;
+        border-radius: 8px;
+        border: 2px solid #2563eb;
+    }
+
     .btn {
         display: block;
         width: 100%;
@@ -73,17 +89,25 @@
         color: white;
         border: none;
         border-radius: 8px;
-        font-size: 16px;
-        font-weight: bold;
+        font-size: 15px;
+        font-weight: 700;
         cursor: pointer;
-        transition: background-color 0.2s;
+        transition: background-color 0.2s, transform 0.1s;
         box-sizing: border-box;
         text-align: center;
         text-decoration: none;
     }
 
-    .btn:hover {
-        background-color: #1d4ed8;
+    .btn:active {
+        transform: scale(0.98);
+    }
+
+    .btn-camera {
+        background-color: #16a34a;
+    }
+
+    .btn-camera:hover {
+        background-color: #15803d;
     }
 
     .btn-secondary {
@@ -97,8 +121,48 @@
         background-color: #f9fafb;
     }
 
-    /* Hidden File Input for Image Upload */
-    #qr-input-file {
+    .error-notice {
+        display: none;
+        margin-bottom: 15px;
+        padding: 12px;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #991b1b;
+        text-align: center;
+        line-height: 1.4;
+    }
+
+    .status-notice {
+        display: none;
+        margin-bottom: 15px;
+        padding: 10px;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #1e40af;
+        text-align: center;
+    }
+
+    .manual-box {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .manual-input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+        box-sizing: border-box;
+        margin-bottom: 10px;
+    }
+
+    input[type="file"] {
         display: none;
     }
   </style>
@@ -107,63 +171,251 @@
 
   <div class="card">
     <h2>Scan to Pay</h2>
-    <p class="subtitle">Position the QR code within the frame</p>
+    <p class="subtitle">Take a photo of the QR code or select an image</p>
 
-    <div class="scanner-wrapper">
+    <!-- Notices -->
+    <div id="status-notice" class="status-notice"></div>
+    <div id="scan-error-notice" class="error-notice"></div>
+
+    <div class="scanner-wrapper" id="scanner-container">
       <div id="qr-reader"></div>
+      <div id="preview-box" class="preview-container">
+        <img id="preview-thumb" class="preview-img" alt="QR Preview">
+        <p style="color: #ffffff; font-size: 12px; margin-top: 6px;">Analyzing QR code...</p>
+      </div>
+      <div id="qr-reader-file-temp" style="display:none;"></div>
     </div>
 
-    <!-- Actions -->
-    <label for="qr-input-file" class="btn">Upload QR Image</label>
-    <input type="file" id="qr-input-file" accept="image/*">
+    <!-- Dual Action Buttons -->
+    <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;">
+      <!-- Button 1: Open Camera App directly on mobile -->
+      <label for="camera-capture-input" class="btn btn-camera">📸 Take Photo with Camera</label>
+      <input type="file" id="camera-capture-input" accept="image/*" capture="environment">
+
+      <!-- Button 2: Choose existing photo from gallery -->
+      <label for="gallery-input" class="btn">🖼️ Choose Photo from Gallery</label>
+      <input type="file" id="gallery-input" accept="image/*">
+    </div>
+
+    <!-- Manual Code Input Fallback -->
+    <div class="manual-box">
+      <p style="font-size: 12px; color: #6b7280; margin-bottom: 8px; text-align: center;">Or paste payment code / link directly:</p>
+      <input type="text" id="manual-token-input" class="manual-input" placeholder="Paste data=... or full URL here">
+      <button class="btn btn-secondary" style="margin-top:0;" onclick="submitManualToken()">Proceed with Link / Code</button>
+    </div>
 
     <button class="btn btn-secondary" onclick="window.history.back()">Cancel</button>
   </div>
 
   <script>
-    const html5QrCode = new Html5Qrcode("qr-reader");
+    let html5QrCode = null;
+    let isScanning = false;
+
+    try {
+        html5QrCode = new Html5Qrcode("qr-reader");
+    } catch(e) {
+        console.error("Failed to initialize Html5Qrcode", e);
+    }
+
+    function showError(msg) {
+        const errBox = document.getElementById("scan-error-notice");
+        if (errBox) {
+            errBox.textContent = msg;
+            errBox.style.display = "block";
+        }
+    }
+
+    function hideError() {
+        const errBox = document.getElementById("scan-error-notice");
+        if (errBox) errBox.style.display = "none";
+    }
+
+    function showStatus(msg) {
+        const box = document.getElementById("status-notice");
+        if (box) {
+            box.innerHTML = msg;
+            box.style.display = "block";
+        }
+    }
+
+    function hideStatus() {
+        const box = document.getElementById("status-notice");
+        if (box) box.style.display = "none";
+    }
 
     function handleSuccess(decodedText) {
-        // Stop scanning upon detection
-        html5QrCode.stop().then(() => {
-            window.location.href = `/review?data=${encodeURIComponent(decodedText)}`;
-        }).catch(() => {
-            window.location.href = `/review?data=${encodeURIComponent(decodedText)}`;
+        hideError();
+        hideStatus();
+        let dataToken = decodedText.trim();
+        
+        // Extract data parameter if full URL is passed
+        if (dataToken.includes("data=")) {
+            try {
+                const urlObj = new URL(dataToken, window.location.origin);
+                dataToken = urlObj.searchParams.get("data") || dataToken;
+            } catch(e) {
+                const match = dataToken.match(/data=([^&]+)/);
+                if (match) dataToken = match[1];
+            }
+        }
+
+        if (html5QrCode && isScanning) {
+            html5QrCode.stop().then(() => {
+                window.location.href = `/review?data=${encodeURIComponent(dataToken)}`;
+            }).catch(() => {
+                window.location.href = `/review?data=${encodeURIComponent(dataToken)}`;
+            });
+        } else {
+            window.location.href = `/review?data=${encodeURIComponent(dataToken)}`;
+        }
+    }
+
+    // Attempt WebRTC live camera if supported & on secure/localhost origin
+    window.addEventListener("DOMContentLoaded", () => {
+        if (!html5QrCode) return;
+        const config = { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 };
+
+        html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
+            handleSuccess(decodedText);
+        }).then(() => {
+            isScanning = true;
+        }).catch(err => {
+            // Over HTTP IP origins, live getUserMedia stream is blocked by browsers.
+            // We smoothly transition UI to Photo Capture / Gallery mode.
+            console.log("Live stream disabled (HTTP origin). Direct camera capture ready.");
+        });
+    });
+
+    // Handle file selection from Camera or Gallery
+    const cameraInput = document.getElementById('camera-capture-input');
+    const galleryInput = document.getElementById('gallery-input');
+
+    cameraInput.addEventListener('change', handleFileSelected);
+    galleryInput.addEventListener('change', handleFileSelected);
+
+    async function handleFileSelected(e) {
+        if (e.target.files.length === 0) return;
+        hideError();
+        const file = e.target.files[0];
+
+        // Display thumbnail preview
+        const previewBox = document.getElementById("preview-box");
+        const previewThumb = document.getElementById("preview-thumb");
+        const qrReader = document.getElementById("qr-reader");
+
+        if (previewThumb && previewBox) {
+            previewThumb.src = URL.createObjectURL(file);
+            previewBox.style.display = "block";
+            if (qrReader) qrReader.style.display = "none";
+        }
+
+        showStatus("🔍 Scanning photo for QR code...");
+
+        if (html5QrCode && isScanning) {
+            try { await html5QrCode.stop(); } catch(err) {}
+            isScanning = false;
+        }
+
+        // Multi-Stage QR Decoder Pipeline
+        try {
+            const token = await processAndDecodeImage(file);
+            handleSuccess(token);
+        } catch(err) {
+            hideStatus();
+            showError("Could not detect a clear QR code in this photo. Please ensure the QR code is bright, centered, or try pasting the payment code below.");
+        }
+    }
+
+    // Advanced Multi-Stage Canvas Resizing & Contrast Filters
+    async function processAndDecodeImage(file) {
+        const img = await loadImage(file);
+        
+        // Stage 1: Try decoding at 800px max dimension with jsQR
+        let token = decodeCanvas(img, 800, false);
+        if (token) return token;
+
+        // Stage 2: Try decoding at 1200px max dimension with jsQR
+        token = decodeCanvas(img, 1200, false);
+        if (token) return token;
+
+        // Stage 3: Try decoding with High-Contrast Threshold Filter (great for shadowy photos)
+        token = decodeCanvas(img, 800, true);
+        if (token) return token;
+
+        // Stage 4: Try decoding original scale
+        token = decodeCanvas(img, img.width, false);
+        if (token) return token;
+
+        // Stage 5: Fallback to Html5Qrcode scanFile engine
+        try {
+            const fileScanner = new Html5Qrcode("qr-reader-file-temp", false);
+            const res = await fileScanner.scanFile(file, true);
+            if (res) return res;
+        } catch(e) {}
+
+        throw new Error("QR detection failed across all stages");
+    }
+
+    function loadImage(file) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error("Image load error"));
+            img.src = URL.createObjectURL(file);
         });
     }
 
-    // 1. Auto-Start Live Camera Scanner on Page Load
-    window.addEventListener("DOMContentLoaded", () => {
-        const config = {
-            fps: 10,
-            qrbox: { width: 220, height: 220 },
-            aspectRatio: 1.0
-        };
+    function decodeCanvas(img, maxDim, applyThreshold) {
+        if (!window.jsQR) return null;
 
-        // 'environment' automatically requests the back camera on mobile devices
-        html5QrCode.start({ facingMode: "environment" }, config, handleSuccess)
-            .catch(err => {
-                console.warn("Camera auto-start failed or permission denied:", err);
-            });
-    });
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
 
-    // 2. Handle File Upload Scanning
-    const fileInput = document.getElementById('qr-input-file');
-    fileInput.addEventListener('change', e => {
-        if (e.target.files.length === 0) return;
+        let width = img.width;
+        let height = img.height;
 
-        const imageFile = e.target.files[0];
+        if (width > maxDim || height > maxDim) {
+            if (width > height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+            } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+            }
+        }
 
-        // Scan the uploaded file
-        html5QrCode.scanFile(imageFile, true)
-            .then(decodedText => {
-                handleSuccess(decodedText);
-            })
-            .catch(err => {
-                alert("No readable QR code found in this image. Please try another.");
-            });
-    });
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const imageData = ctx.getImageData(0, 0, width, height);
+
+        if (applyThreshold) {
+            // Apply binarization / high-contrast threshold filter
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                const val = avg > 128 ? 255 : 0;
+                data[i] = val;
+                data[i + 1] = val;
+                data[i + 2] = val;
+            }
+        }
+
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        return code ? code.data : null;
+    }
+
+    function submitManualToken() {
+        const val = document.getElementById("manual-token-input").value.trim();
+        if (!val) {
+            showError("Please paste or enter a payment code or link.");
+            return;
+        }
+        handleSuccess(val);
+    }
   </script>
 
 </body>
 </html>
+
