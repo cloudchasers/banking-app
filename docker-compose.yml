@@ -14,4 +14,4 @@ services:
     expose:
       - "5001"
     environment: 
-      - ECOMMERCE_PUBLIC_BASE="http://3.90.15.65"
+      - ECOMMERCE_PUBLIC_BASE=http://3.90.15.65

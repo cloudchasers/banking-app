@@ -25,7 +25,7 @@ try:
 
         # 4. Fetch column headers and rows
         column_names = [i[0] for i in cursor.description]
-        rows = cursor.fetchone()
+        rows = cursor.fetchall()
 
         print(rows)
         print(type(rows))
