@@ -54,10 +54,14 @@
             <div class="row total"><span>Amount:</span> <span>₱{{ tx.amount }}</span></div>
         </div>
         
+
         <!-- Submitting this form triggers the /process route -->
         <form action="/process" method="POST">
+            <input type="hidden" name="order_id" value="{{ tx.order_id }}">
+            <input type="hidden" name="amount" value="{{ tx.amount }}">
             <button type="submit" class="btn">Authorize Payment</button>
         </form>
+
     </div>
 </body>
 </html>
