@@ -28,6 +28,23 @@
         .success-text { color: #16a34a; margin-top: 0; }
         .error-text { color: #dc2626; margin-top: 0; }
         p { color: #4b5563; line-height: 1.5; }
+        .btn-dashboard {
+            display: inline-block;
+            width: 100%;
+            padding: 14px;
+            margin-top: 20px;
+            background-color: #2563eb;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            box-sizing: border-box;
+            transition: background-color 0.2s;
+        }
+        .btn-dashboard:hover {
+            background-color: #1d4ed8;
+        }
     </style>
 </head>
 <body>
@@ -36,17 +53,27 @@
             <div class="icon">✅</div>
             <h2 class="success-text">Payment Successful</h2>
             <p>Your transaction has been processed securely.</p>
-            <p><strong>This window will close automatically in a moment...</strong></p>
-            <script>
-                setTimeout(() => {
-                    window.close();
-                }, 3000);
-            </script>
+            <a href="{{ url_for('dashboard') }}" class="btn-dashboard">Back to Dashboard</a>
         {% else %}
             <div class="icon">❌</div>
             <h2 class="error-text">Payment Failed</h2>
             <p>There was an issue processing your transaction. Please try scanning the QR code again.</p>
+            <a href="{{ url_for('dashboard') }}" class="btn-dashboard">Back to Dashboard</a>
         {% endif %}
     </div>
+
+    <script>
+        // Prevent back button from re-navigating to payment review/process
+        history.pushState(null, "", location.href);
+        window.addEventListener("popstate", function () {
+            window.location.replace("{{ url_for('dashboard') }}");
+        });
+
+        {% if success %}
+        setTimeout(() => {
+            window.close();
+        }, 5000);
+        {% endif %}
+    </script>
 </body>
 </html>
